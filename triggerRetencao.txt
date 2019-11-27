@@ -1,0 +1,550 @@
+delimiter #
+
+-- empregados
+CREATE TRIGGER datawarehouse_employee
+AFTER INSERT
+ON empregados
+FOR EACH ROW
+BEGIN
+	DECLARE first,last,job varchar(100);
+	DECLARE comp,ci,co varchar(50);
+	DECLARE dat date;
+	
+	SET first := new.first_name;
+	SET last := new.last_name;
+	SET job := new.jobtitle;
+	SET comp := new.company;
+	SET ci := new.city;
+	SET co := new.country;
+	SET dat := cast(new.create_time as date);
+	
+	IF first is null then
+	SET first := 'Undefined';
+	END IF;
+	
+	IF last is null then
+	SET last := 'Undefined';
+	END IF;
+	
+	IF job is null then
+	SET job := 'Undefined';
+	END IF;
+	
+	IF comp is null then
+	SET comp := 'Undefined';
+	END IF;
+	
+	IF ci is null then
+	SET ci := 'Undefined';
+	END IF;
+	
+	IF co is null then
+	SET co := 'Undefined';
+	END IF;
+	
+	IF new.type = 'I'then 
+
+	insert into dw_northwind.dim_employees(company,name,jobtitle,city,country,is_current,created_date,expired_date) 
+	values(comp,concat(first,_utf8' ',last),job,ci,co,'yes',dat,null);
+	
+	else
+	
+	IF new.type ='U' then
+	
+	insert into dw_northwind.dim_employees(company,name,jobtitle,city,country,is_current,created_date,expired_date) 
+	values(comp,concat(first,_utf8' ',last),job,ci,co,'yes',dat,null);
+	
+	Update dw_northwind.dim_employees set expired_date=Now(),is_current='no' where iddim_employees=new.idempregados;
+	else
+	Update dw_northwind.dim_employees set expired_date=Now(),is_current='no' where iddim_employees=new.idempregados;
+	END IF;
+	END IF;
+END# 
+
+-- compra_ordem_detalhes
+
+CREATE TRIGGER datawarehouse_purchase_order_details
+AFTER INSERT
+ON compra_ordem_detalhes
+FOR EACH ROW
+BEGIN
+	DECLARE idpod,pid integer;
+	DECLARE quant, unit decimal(18,14);
+	DECLARE dat date;
+		
+	SELECT max(idpurchase_details) INTO idpod FROM dw_northwind.dim_purchase_details;
+	
+	SET pid := new.product_id;
+	SET quant := new.quantidade;
+	SET unit := new.unit_cost;
+	SET dat := cast(new.create_time as date);
+	
+	IF pid is null then
+	SET pid := 100;
+	END IF;
+	
+	IF quant is null then
+	SET quant := 0;
+	END IF;
+	
+	IF unit is null then
+	SET unit := 0;
+	END IF;
+
+	
+	IF new.type = 'I'then 
+
+	insert into dw_northwind.dim_purchase_details(idpurchase_details,porduct_id,quantity,dim_purchase_order_iddim_purchase_order,is_current,created_date,expired_date) 
+	values(idpod+1,pid,quant,new.compra_id,'yes',dat,null);
+	
+	else
+	
+	IF new.type ='U' then
+	
+	insert into dw_northwind.dim_purchase_details(idpurchase_details,porduct_id,quantity,dim_purchase_order_iddim_purchase_order,is_current,created_date,expired_date) 
+	values(idpod+1,pid,quant,new.compra_id,'yes',dat,null);
+	
+	Update dw_northwind.dim_purchase_details set expired_date=Now(),is_current='no' where idpurchase_details=new.id_compra_details;
+	else
+	Update dw_northwind.dim_purchase_details set expired_date=Now(),is_current='no' where idpurchase_details=new.id_compra_details;
+	END IF;
+	END IF;
+END# 
+
+-- compra_ordem
+
+CREATE TRIGGER datawarehouse_purchase_order
+AFTER INSERT
+ON compra_ordem
+FOR EACH ROW
+BEGIN
+	DECLARE idpo,eid,fid integer;
+	DECLARE stat varchar(50);
+	DECLARE dat date;
+		
+	SELECT max(iddim_purchase_order) INTO idpo FROM dw_northwind.dim_purchase_order;
+	
+	SET eid := new.id_empregado;
+	SET fid := new.id_fornecedor;
+	SET dat := cast(new.create_time as date);
+	
+	IF eid is null then
+	SET eid := 10;
+	END IF;
+	
+	IF fid is null then
+	SET fid := 11;
+	END IF;
+
+	IF new.status is null then
+	SET stat := 'New';
+	ELSE
+	Select status into stat from northwind.purchase_order_status where id=new.status;
+	END IF;
+	
+	IF new.type = 'I'then 
+
+	insert into dw_northwind.dim_purchase_order(iddim_purchase_order,status,dim_employees_iddim_employees,dim_suplier_iddim_suplier,is_current,created_date,expired_date) 
+	values(idpo+1,stat,eid,fid,'yes',dat,null);
+	
+	else
+	
+	IF new.type ='U' then
+	
+	insert into dw_northwind.dim_purchase_order(iddim_purchase_order,status,dim_employees_iddim_employees,dim_suplier_iddim_suplier,is_current,created_date,expired_date) 
+	values(idpo+1,stat,eid,fid,'yes',dat,null);
+	
+	Update dw_northwind.dim_purchase_order set expired_date=Now(),is_current='no' where iddim_purchase_order=new.id_compra_ordem;
+	else
+	Update dw_northwind.dim_purchase_order set expired_date=Now(),is_current='no' where iddim_purchase_order=new.id_compra_ordem;
+	END IF;
+	END IF;
+END# 
+
+-- faturas
+
+CREATE TRIGGER datawarehouse_invoice
+AFTER INSERT
+ON faturas
+FOR EACH ROW
+BEGIN
+	DECLARE idi integer;
+	DECLARE dat date;
+		
+	SELECT max(iddim_invoice) INTO idi FROM dw_northwind.dim_invoice;
+	
+	SET dat := cast(new.create_time as date);
+	
+	IF new.type = 'I'then 
+
+	insert into dw_northwind.dim_invoice(iddim_invoice,factos_order_idfactos_order,is_current,created_date,expired_date) 
+	values(idi+1,new.id_order,'yes',dat,null);
+	
+	else
+	
+	IF new.type ='U' then
+	
+	insert into dw_northwind.dim_invoice(iddim_invoice,factos_order_idfactos_order,is_current,created_date,expired_date) 
+	values(idi+1,new.id_order,'yes',dat,null);
+	
+	Update dw_northwind.dim_invoice set expired_date=Now(),is_current='no' where iddim_invoice=new.id_fatura;
+	else
+	Update dw_northwind.dim_invoice set expired_date=Now(),is_current='no' where iddim_invoice=new.id_fatura;
+	END IF;
+	END IF;
+END#
+
+-- detalhes_ordem
+
+CREATE TRIGGER datawarehouse_order_details
+AFTER INSERT
+ON detalhes_ordem
+FOR EACH ROW
+BEGIN
+	DECLARE idod,idf,pid integer;
+	DECLARE quant, unit decimal(18,14);
+	DECLARE dat date;
+		
+	SELECT max(order_details) INTO idod FROM dw_northwind.order_details_produto;
+	
+	SET idf := new.id_factos;
+	SET pid := new.idprodutos;
+	SET quant := new.quantidade;
+	SET unit := new.unit_price;
+	SET dat := cast(new.create_time as date);
+	
+	IF pid is null then
+	SET pid := 100;
+	END IF;
+	
+	IF quant is null then
+	SET quant := 0;
+	END IF;
+	
+	IF unit is null then
+	SET unit := 0;
+	END IF;
+
+	
+	IF new.type = 'I'then 
+
+	insert into dw_northwind.order_details_produto(order_details,factos_order_idfactos_order,dim_products_iddim_products,quantity,unit_price,is_current,created_date,expired_date) 
+	values(idod+1,idf,pid,quant,unit,'yes',dat,null);
+	
+	else
+	
+	IF new.type ='U' then
+	
+	insert into dw_northwind.order_details_produto(order_details,factos_order_idfactos_order,dim_products_iddim_products,quantity,unit_price,is_current,created_date,expired_date) 
+	values(idod+1,idf,pid,quant,unit,'yes',dat,null);
+	
+	Update dw_northwind.order_details_produto set expired_date=Now(),is_current='no' where order_details=new.id_ordem_detalhes;
+	else
+	Update dw_northwind.order_details_produto set expired_date=Now(),is_current='no' where order_details=new.id_ordem_detalhes;
+	END IF;
+	END IF;
+END# 
+
+-- cliente
+
+CREATE TRIGGER datawarehouse_customer
+AFTER INSERT
+ON cliente
+FOR EACH ROW
+BEGIN
+	DECLARE first,last varchar(100);
+	DECLARE comp,ci,co,job varchar(50);
+	DECLARE dat date;
+	
+	SET first := new.first_name;
+	SET last := new.last_name;
+	SET job := new.jobtitle;
+	SET comp := new.company;
+	SET ci := new.city;
+	SET co := new.country;
+	SET dat := cast(new.create_time as date);
+	
+	IF first is null then
+	SET first := 'Undefined';
+	END IF;
+	
+	IF last is null then
+	SET last := 'Undefined';
+	END IF;
+	
+	IF job is null then
+	SET job := 'Undefined';
+	END IF;
+	
+	IF comp is null then
+	SET comp := 'Undefined';
+	END IF;
+	
+	IF ci is null then
+	SET ci := 'Undefined';
+	END IF;
+	
+	IF co is null then
+	SET co := 'Undefined';
+	END IF;
+	
+	IF new.type = 'I'then 
+
+	insert into dw_northwind.dim_customers(company,name,jobtitle,city,country,is_current,created_date,expired_date) 
+	values(comp,concat(first,_utf8' ',last),job,ci,co,'yes',dat,null);
+	
+	else
+	
+	IF new.type ='U' then
+	
+	insert into dw_northwind.dim_customers(company,name,jobtitle,city,country,is_current,created_date,expired_date) 
+	values(comp,concat(first,_utf8' ',last),job,ci,co,'yes',dat,null);
+	
+	Update dw_northwind.dim_customers set expired_date=Now(),is_current='no' where iddim_customers=new.idcliente;
+	else
+	Update dw_northwind.dim_customers set expired_date=Now(),is_current='no' where iddim_customers=new.idcliente;
+	END IF;
+	END IF;
+END# 
+
+-- produtos
+
+CREATE TRIGGER datawarehouse_produto
+AFTER INSERT
+ON produtos
+FOR EACH ROW
+
+BEGIN
+
+	DECLARE preco_base decimal(19,4);
+	DECLARE dat date;
+	DECLARE n,cat varchar(50);
+	DECLARE idp,quan int(11);
+	
+	select max(iddim_products) into idp from dw_northwind.dim_products;
+	
+	SET preco_base := new.standard_cost;
+	SET n := new.nome;
+	SET cat := new.category;
+	SET quan := new.quantidade;
+	SET dat := cast(new.create_time as date);
+	
+	if quan is null then
+	SET quan := 0;
+	End if;
+	
+	if preco_base is null then
+	SET preco_base := 0.00;
+	End if;
+	
+	if n is null then
+	SET n := 'Undefined';
+	End if;
+	
+	if cat is null then
+	SET cat := 'Undefined';
+	End if;
+
+	if new.type = 'I'then 
+
+	insert into dw_northwind.dim_products(iddim_products,name,standard_cost,list_price,category,quantity_stock,is_current,created_date,expired_date) 
+	values(idp+1,n,preco_base,list_price,cat,quan,'yes',dat,null);
+	else
+	
+	if new.type ='U' then
+	
+	insert into dw_northwind.dim_products(iddim_products,name,standard_cost,list_price,category,quantity_stock,is_current,created_date,expired_date) 
+	values(idp+1,n,preco_base,list_price,cat,quan,'yes',dat,null);
+	
+	Update dw_northwind.dim_products set expired_date=Now(),is_current='no' where 	iddim_products=new.id_produto;
+	else
+	
+	Update dw_northwind.dim_products set expired_date=Now(),is_current='no' where 	iddim_products=new.id_produto;
+	
+	End If;
+	End If;
+END#
+
+
+
+-- remetente
+
+CREATE TRIGGER datawarehouse_shipper
+AFTER INSERT
+ON remetente
+FOR EACH ROW
+BEGIN
+
+	DECLARE company,city,country varchar(100);	
+	DECLARE dat date;
+	
+	SET company := new.company;
+	SET city := new.city;
+	SET country := new.country;
+	SET dat := cast(new.create_time as date);
+		
+	
+	if company is null then
+	SET company := 'Undefined';
+	End If;
+	
+	if city is null then
+	SET city := 'Undefined';
+	End If;
+	
+	if country is null then
+	SET country := 'Undefined';
+	End If;
+	
+	if new.type = 'I'then 
+
+	insert into dw_northwind.dim_shippers(company,city,country, is_current, created_date, expired_date) 
+	values(company,city,country,'yes',dat,null);
+	else
+	
+	if new.type ='U' then
+	
+	insert into dw_northwind.dim_shippers(company,city,country, is_current, created_date, expired_date) 
+	values(company,city,country,'yes',dat,null);
+		
+	Update dw_northwind.dim_shippers set expired_date=Now(),is_current='no' where iddim_shippers=new.id_remetente;
+	else
+	
+	Update dw_northwind.dim_shippers set expired_date=Now(),is_current='no' where iddim_shippers=new.id_remetente;
+	
+	End If;
+	End If;
+END#
+
+
+-- fornecedores
+
+CREATE TRIGGER datawarehouse_suppliers
+AFTER INSERT
+ON fornecedores
+FOR EACH ROW
+BEGIN
+
+	DECLARE first,last,job varchar(100);
+	DECLARE company,city,country varchar(100);
+	DECLARE dat date;
+	
+	SET first := new.first_name;
+	SET last := new.last_name;
+	SET job := new.jobtitle;
+	SET company := new.company;
+	SET dat := cast(new.create_time as date);
+	
+	if first is null then
+	SET first := 'Undefined';
+	End If;
+	
+	if last is null then
+	SET last := 'Undefined';
+	End If;
+	
+	if job is null then
+	SET job := 'Undefined';
+	End If;
+	
+	if company is null then
+	SET company := 'Undefined';
+	End If;
+	
+	
+	if new.type = 'I'then 
+
+	insert into dw_northwind.dim_suplier(company,name,jobtitle,is_current,created_date, expired_date) 
+	values(company,concat(first,_utf8' ',last),'yes',dat,null);
+	else
+	
+	if new.type ='U' then
+	
+	insert into dw_northwind.dim_suplier(company,name,jobtitle,is_current,created_date, expired_date) 
+	values(company,concat(first,_utf8' ',last),'yes',dat,null);
+		
+	Update dw_northwind.dim_suplier set expired_date=Now(),is_current='no' where iddim_suplier=new.id_fornecedor;
+	else
+	
+	Update dw_northwind.dim_suplier set expired_date=Now(),is_current='no' where iddim_suplier=new.id_fornecedor;
+	
+	End If;
+	End If;
+END#
+
+
+-- ordem
+
+CREATE TRIGGER datawarehouse_orders
+AFTER INSERT
+ON ordem
+FOR EACH ROW
+BEGIN
+
+	DECLARE id_emplo, id_cus,status,id_data,id_shi,id_paid, ido, ids  int(11);
+	DECLARE dat date;
+	DECLARE ptype int(11);
+	
+	select max(idfactos_order) into ido from dw_northwind.factos_order;
+	select idDim_payment into ptype from dim_payment where payment_type=new.payment_type;
+	
+	SET id_emplo := new.id_empregado;
+	SET id_cus := new.id_cliente;
+	SET ids := new.id_remetente;
+	SET status := new.status_id;
+	SET dat := cast(new.create_time as date);
+	
+	
+	if id_emplo is null then
+	SET id_emplo := 10;
+	EnD IF;
+	
+	if ids is null then
+	SET ids := 4;
+	EnD IF;
+	
+	if ptype is null then
+	SET ptype := 1;
+	EnD IF;
+	
+	if id_cus is null then
+	SET id_cus := 30;
+	EnD IF;
+	
+	if new.data_ordem is null then
+	SET id_data := 7141;
+	else
+	select iddim_data into id_data from dim_data where Date_da_ordem=data_ordem;
+	EnD IF;
+	
+	if new.data_shipped is null then
+	SET id_shi := 7141;
+	else
+	select iddim_data into id_shi from dim_data where Date_da_ordem=data_shipped;
+	EnD IF;
+	
+	if new.data_paid is null then
+	SET id_paid := 7141;
+	else
+	select iddim_data into id_paid from dim_data where Date_da_ordem=data_paid;
+	EnD IF;
+	
+	if status is null then
+	SET status := 4;
+	EnD IF;
+	if new.type = 'I'then 
+
+	insert into dw_northwind.factos_order(idfactos_order,dim_customers_iddim_customers,dim_employees_iddim_employees,dim_shippers_iddim_shippers,dim_data_idorder_date,Dim_payment_idDim_payment,
+	dim_order_status_iddim_order_satus,dim_data_idpaid_date,dim_data_idshipped_date) 
+	values(ido+1,id_cus,id_emplo,ids,id_data,ptype,status,id_paid,id_shi);
+	else
+	
+	if new.type ='U' then
+	
+	insert into dw_northwind.factos_order(idfactos_order,dim_customers_iddim_customers,dim_employees_iddim_employees,dim_shippers_iddim_shippers,dim_data_idorder_date,Dim_payment_idDim_payment,
+	dim_order_status_iddim_order_satus,dim_data_idpaid_date,dim_data_idshipped_date) 
+	values(ido+1,id_cus,id_emplo,ids,id_data,ptype,status,id_paid,id_shi);
+	End If;
+	End If;
+END#
+
